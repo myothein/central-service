@@ -51,3 +51,56 @@ jobs:
         run: npm run build
       - name: Security smoke tests
         run: npm test
+
+  postgresql-event-contract:
+    needs: lockfile-bootstrap
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      SYSTEM_DATABASE_URL: postgresql://ci_qa:ci_only_password@127.0.0.1:5432/central_ci_qa
+      RUN_PG_INTEGRATION: '1'
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: ci_qa
+          POSTGRES_PASSWORD: ci_only_password
+          POSTGRES_DB: central_ci_qa
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci_qa -d central_ci_qa"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Clean install and compile
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build
+      - name: Retrieve pinned system schema migration (no private configuration)
+        shell: bash
+        run: |
+          curl -fsSL --retry 3 "https://raw.githubusercontent.com/myothein/db-helper/bfae1246e28a43626e00627b9b812af579af4ab3/prisma/system/migrations/001_init_system_db/migration.sql" -o /tmp/central-system-init.sql
+      - name: Apply migration ONLY to ephemeral PostgreSQL service
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const { Client } = require('pg');
+          (async () => {
+            const db = new Client({ connectionString: process.env.SYSTEM_DATABASE_URL });
+            await db.connect();
+            try { await db.query(fs.readFileSync('/tmp/central-system-init.sql','utf8')); }
+            finally { await db.end(); }
+          })().catch(() => { console.error('Ephemeral migration rejected'); process.exitCode = 1; });
+          NODE
+      - name: Verify tenant-scoped event ingestion, idempotency and collision denial
+        run: npm run test:postgres

@@ -9,7 +9,8 @@
     "build": "tsc",
     "lint": "eslint . --ext .ts",
     "format": "prettier --write .",
-    "test": "npm run build && node --test dist/__tests__/security.test.js"
+    "test": "npm run build && node --test dist/__tests__/*.test.js",
+    "test:postgres": "npm run build && node --test dist/__tests__/event-postgres.integration.test.js"
   },
   "dependencies": {
     "body-parser": "^1.20.2",
