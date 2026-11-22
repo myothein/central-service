@@ -51,20 +51,20 @@ eventRoutes.post('/', requireTenantAgent, (req: Request, res: Response, next: Ne
             res.status(201).json({ success: true, status: 'accepted', eventId: body.id });
             return;
         }
+        const activeTenant = await db.query<{id:string}>(
+            'SELECT "id" FROM "tenants" WHERE "id"=$1 AND "isActive"=true AND "status"=\'ACTIVE\'',
+            [body.tenantId]
+        );
+        if (!activeTenant.rows[0]) {
+            res.status(404).json({ success: false, code: 'TENANT_NOT_ACTIVE' });
+            return;
+        }
         const matched = await db.query<{id:string}>(`
             SELECT "id" FROM "events" WHERE "id"=$1 AND "tenantId"=$2
             AND "agentId" IS NOT DISTINCT FROM $3 AND "type"=$4
             AND "payload"=$5::jsonb AND "occurredAt"=$6::timestamp`, params);
         if (matched.rows[0]) {
             res.status(200).json({ success: true, status: 'duplicate', eventId: body.id });
-            return;
-        }
-        const exists = await db.query<{id:string}>(
-            'SELECT "id" FROM "tenants" WHERE "id"=$1 AND "isActive"=true AND "status"=\'ACTIVE\'',
-            [body.tenantId]
-        );
-        if (!exists.rows[0]) {
-            res.status(404).json({ success: false, code: 'TENANT_NOT_ACTIVE' });
             return;
         }
         res.status(409).json({ success: false, code: 'EVENT_ID_COLLISION' });

@@ -29,7 +29,8 @@ export function requireTenantAgent(req: Request, res: Response, next: NextFuncti
     if (typeof tenantId !== 'string' || !tenantCodePattern.test(tenantId)) {
         return res.status(400).json({ success: false, code: 'INVALID_TENANT' });
     }
-    const expected = credentials[tenantId];
+    const expected = Object.prototype.hasOwnProperty.call(credentials, tenantId)
+        ? credentials[tenantId] : undefined;
     const header = req.get('authorization') || '';
     const provided = header.startsWith('Bearer ') ? header.slice(7) : '';
     // A tenant identifier in an HTTP request is never proof of authorization.

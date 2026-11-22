@@ -58,15 +58,15 @@ test('management API rejects invalid bearer token', async () => {
     }
 });
 
-test('event ingestion does not falsely acknowledge writes before implementation', async () => {
+test('event ingestion fails closed without provisioned agent credentials', async () => {
     const response = await request('/api/v1/events', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ id: 'test-event', type: 'example' })
     });
-    assert.equal(response.status, 501);
+    assert.equal(response.status, 503);
     const body = await response.json() as { code: string };
-    assert.equal(body.code, 'NOT_IMPLEMENTED');
+    assert.equal(body.code, 'AUTH_NOT_CONFIGURED');
 });
 
 test('disallowed browser origin does not receive permissive CORS headers', async () => {
