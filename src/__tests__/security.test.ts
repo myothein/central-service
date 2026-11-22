@@ -3,13 +3,17 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { app } from '../server';
 
-async function request(path: string, options: RequestInit = {}): Promise<Response> {
+type CapturedResponse = { status: number; headers: Headers; json: () => Promise<unknown> };
+async function request(path: string, options: RequestInit = {}): Promise<CapturedResponse> {
     const server = app.listen(0, '127.0.0.1');
     try {
         await once(server, 'listening');
         const address = server.address();
         if (!address || typeof address === 'string') throw new Error('No TCP listener');
-        return await fetch('http://127.0.0.1:' + address.port + path, options);
+        const response = await fetch('http://127.0.0.1:' + address.port + path, options);
+        // Read the complete response before closing the listener (no active socket leak).
+        const body = await response.text();
+        return { status: response.status, headers: response.headers, json: async () => JSON.parse(body) };
     } finally {
         await new Promise<void>((resolve, reject) => {
             server.close(error => error ? reject(error) : resolve());
