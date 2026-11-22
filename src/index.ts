@@ -1,3 +1,5 @@
-import './server';
+import { app } from './server';
+import { loadConfig } from './config/load-config';
 
-console.log('✅ Central Service started');
+const { port } = loadConfig();
+app.listen(port, () => console.log('Central Service listening on port ' + port));
