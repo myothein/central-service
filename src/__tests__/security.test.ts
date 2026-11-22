@@ -75,3 +75,21 @@ test('disallowed browser origin does not receive permissive CORS headers', async
     });
     assert.equal(response.headers.get('access-control-allow-origin'), null);
 });
+
+test('heartbeat API rejects unauthenticated agents before writing database state', async () => {
+    const prior=process.env.CENTRAL_AGENT_KEYS_JSON;
+    delete process.env.CENTRAL_AGENT_KEYS_JSON;
+    try {
+        const response=await request('/api/v1/heartbeats',{
+            method:'POST',
+            headers:{'content-type':'application/json'},
+            body:JSON.stringify({tenantId:'university-ci-a', sentAt:Date.now()})
+        });
+        assert.equal(response.status,503);
+        const body=await response.json() as {code:string};
+        assert.equal(body.code,'AUTH_NOT_CONFIGURED');
+    } finally {
+        if(prior===undefined)delete process.env.CENTRAL_AGENT_KEYS_JSON;
+        else process.env.CENTRAL_AGENT_KEYS_JSON=prior;
+    }
+});

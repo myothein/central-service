@@ -28,6 +28,25 @@ async function api(payload: unknown, token: string) {
     }
 }
 
+
+async function heartbeat(tenantId: string, token: string, sentAt: number) {
+    const server = app.listen(0, '127.0.0.1');
+    try {
+        await once(server, 'listening');
+        const address = server.address();
+        if (!address || typeof address === 'string') throw Error('No test port');
+        const res = await fetch('http://127.0.0.1:' + address.port + '/api/v1/heartbeats', {
+            method:'POST', headers:{ 'content-type':'application/json',
+                authorization:'Bearer ' + token },
+            body:JSON.stringify({tenantId, sentAt})
+        });
+        return {status:res.status, body:await res.json() as {success?:boolean;status?:string}};
+    } finally {
+        await new Promise<void>((resolve,reject) =>
+            server.close(e => e ? reject(e) : resolve()));
+    }
+}
+
 test('PostgreSQL: tenant-scoped durable ingestion, idempotent retry and collision prevention', {
     skip: process.env.RUN_PG_INTEGRATION !== '1'
 }, async () => {
@@ -62,7 +81,20 @@ test('PostgreSQL: tenant-scoped durable ingestion, idempotent retry and collisio
         assert.equal(persisted.rows[0].type,'subject.created');
         assert.deepEqual(persisted.rows[0].payload,
             {data:{id:33,name:'Physics'},aggregate_type:'Subject',aggregate_id:'33'});
+        const live = await heartbeat(tenantA, tokenA, 1);
+        assert.equal(live.status, 200, 'Valid tenant heartbeat must be acknowledged');
+        assert.equal(live.body.status,'recorded');
+        const storedHeartbeat = await db.query(
+            'SELECT "lastHeartbeat" FROM "tenants" WHERE "id"=$1',[tenantA]);
+        assert.ok(storedHeartbeat.rows[0].lastHeartbeat);
+        const clockTime = new Date(storedHeartbeat.rows[0].lastHeartbeat).getTime();
+        assert.ok(Math.abs(Date.now()-clockTime)<60_000,
+            'Database timestamp must not trust the agent supplied 1970 timestamp');
+        const spoofed = await heartbeat(tenantB, tokenA, Date.now());
+        assert.equal(spoofed.status,401);
         await db.query('UPDATE "tenants" SET "status"=\'SUSPENDED\' WHERE "id"=$1', [tenantB]);
+        const stoppedHeartbeat=await heartbeat(tenantB,tokenB,Date.now());
+        assert.equal(stoppedHeartbeat.status,404);
         const stopped = await api({...payload,id:randomUUID(),tenantId:tenantB},tokenB);
         assert.equal(stopped.status,404);
         const rowCount=await db.query('SELECT count(*)::int AS n FROM "events" WHERE "id"=$1',[id]);
