@@ -19,6 +19,9 @@ export function requireTenantAgent(req: Request, res: Response, next: NextFuncti
         if (values.length === 0 || values.length > 1000 || values.some(value =>
             typeof value !== 'string' || Buffer.byteLength(value, 'utf8') < 32) ||
             new Set(values).size !== values.length ||
+            // Never let an administrator credential double as a tenant agent credential.
+            (process.env.CENTRAL_ADMIN_API_KEY !== undefined &&
+                values.includes(process.env.CENTRAL_ADMIN_API_KEY)) ||
             Object.keys(credentials).some(code => !tenantCodePattern.test(code))) {
             throw new Error('invalid');
         }
