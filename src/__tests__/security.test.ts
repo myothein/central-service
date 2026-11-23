@@ -42,9 +42,17 @@ test('management API fails closed without configured administrator credential', 
     }
 });
 
-test('management API rejects invalid bearer token', async () => {
-    const previous = process.env.CENTRAL_ADMIN_API_KEY;
+test('QA-only shared key rejects invalid bearer token', async () => {
+    const previous = {
+        key: process.env.CENTRAL_ADMIN_API_KEY,
+        mode: process.env.CENTRAL_ADMIN_AUTH_MODE,
+        allow: process.env.CENTRAL_ALLOW_DEV_API_KEY,
+        node: process.env.NODE_ENV
+    };
     process.env.CENTRAL_ADMIN_API_KEY = 'development-test-key-with-at-least-32-characters';
+    process.env.CENTRAL_ADMIN_AUTH_MODE = 'legacy';
+    process.env.CENTRAL_ALLOW_DEV_API_KEY = 'true';
+    process.env.NODE_ENV = 'test';
     try {
         const response = await request('/api/v1/tenants', {
             headers: { authorization: 'Bearer invalid-token' }
@@ -53,8 +61,13 @@ test('management API rejects invalid bearer token', async () => {
         const body = await response.json() as { code: string };
         assert.equal(body.code, 'UNAUTHORIZED');
     } finally {
-        if (previous === undefined) delete process.env.CENTRAL_ADMIN_API_KEY;
-        else process.env.CENTRAL_ADMIN_API_KEY = previous;
+        for (const [envKey, value] of [
+            ['CENTRAL_ADMIN_API_KEY', previous.key], ['CENTRAL_ADMIN_AUTH_MODE', previous.mode],
+            ['CENTRAL_ALLOW_DEV_API_KEY', previous.allow], ['NODE_ENV', previous.node]
+        ] as Array<[string, string | undefined]>) {
+            if (value === undefined) delete process.env[envKey];
+            else process.env[envKey] = value;
+        }
     }
 });
 
