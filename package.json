@@ -8,7 +8,9 @@
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc",
     "lint": "eslint . --ext .ts",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test": "npm run build && node --test dist/__tests__/*.test.js",
+    "test:postgres": "npm run build && node --test dist/__tests__/event-postgres.integration.test.js"
   },
   "dependencies": {
     "body-parser": "^1.20.2",
@@ -17,7 +19,9 @@
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "express-validator": "^7.3.1",
-    "uuid": "^13.0.0"
+    "uuid": "^13.0.0",
+    "pg": "^8.16.3",
+    "jose": "^5.10.0"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
@@ -26,6 +30,8 @@
     "prettier": "^3.0.0",
     "ts-node": "^10.9.1",
     "ts-node-dev": "^2.0.0",
-    "typescript": "^5.2.2"
+    "typescript": "^5.2.2",
+    "@types/pg": "^8.15.6",
+    "@types/cors": "^2.8.19"
   }
 }

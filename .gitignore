@@ -1,0 +1,22 @@
+# Never commit local configuration, runtime outputs, or installed dependencies.
+node_modules/
+dist/
+build/
+coverage/
+.env
+.env.*
+!.env.example
+!.env.template
+logs/
+data/
+mybackup/
+*.log
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+*.dump
+*.backup
+.DS_Store

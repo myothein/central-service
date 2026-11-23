@@ -1,34 +1,32 @@
 import express, { Application } from 'express';
 import cors from 'cors';
-import { json } from 'body-parser';
 import { loadConfig } from './config/load-config';
 import { tenantRoutes } from './api/v1/modules/tenant/routes/tenant.routes';
-import { eventRoutes } from './api/v1/modules/event/routes/event.routes';
-import { agentRoutes } from './api/v1/modules/agent/routes/agent.routes';
-import { projectionRoutes } from './api/v1/modules/projection/routes/projection.routes';
-import { heartbeatRoutes } from './api/v1/modules/heartbeat/routes/heartbeat.routes';
-import { authRoutes } from './api/v1/modules/auth/routes/auth.routes';
+import { eventRoutes } from './api/v1/modules/event/event.routes';
+import { heartbeatRoutes } from './api/v1/modules/heartbeat/heartbeat.routes';
 import { errorHandler } from './shared/http/error-handler';
 
-const config = loadConfig();
-const app: Application = express();
+loadConfig();
+export const app: Application = express();
+app.disable('x-powered-by');
 
-app.use(cors());
-app.use(json());
+const allowedOrigins = (process.env.CENTRAL_ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+app.use(cors({ origin: allowedOrigins.length ? allowedOrigins : false }));
+app.use(express.json({ limit: '256kb' }));
 
-// Base routes
+// Liveness only. This does not certify DB readiness or integration health.
+app.get('/health', (_req, res) => res.json({ status: 'alive' }));
+
 app.use('/api/v1/tenants', tenantRoutes);
 app.use('/api/v1/events', eventRoutes);
-app.use('/api/v1/agents', agentRoutes);
-app.use('/api/v1/projections', projectionRoutes);
 app.use('/api/v1/heartbeats', heartbeatRoutes);
-app.use('/api/v1/auth', authRoutes);
 
-// Error handling
+// Fail closed until these APIs are implemented, authenticated and integration tested.
+// In particular, tenant-agent must retry on 501, never mark events as delivered.
+for (const path of ['/api/v1/agents', '/api/v1/projections', '/api/v1/auth']) {
+    app.use(path, (_req, res) => res.status(501).json({
+        success: false, code: 'NOT_IMPLEMENTED', message: 'Endpoint is not yet available'
+    }));
+}
+
 app.use(errorHandler);
-
-const PORT = config.port || 3000;
-
-app.listen(PORT, () => {
-    console.log(`🚀 Central Service running on port ${PORT}`);
-});

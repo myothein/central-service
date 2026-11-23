@@ -1,11 +1,11 @@
 import { logger } from '../../shared/utils/logger';
 
 export class HeartbeatScheduler {
-    private intervalId: NodeJS.Timer | null = null;
+    private intervalId: NodeJS.Timeout | null = null;
 
     start(intervalMs: number = 60000) {
         if (this.intervalId) return;
-        this.intervalId = setInterval(() => this.checkHeartbeats(), intervalMs);
+        this.intervalId = setInterval(() => void this.checkHeartbeats(), intervalMs);
         logger.info('Heartbeat scheduler started');
     }
 
@@ -16,7 +16,7 @@ export class HeartbeatScheduler {
     }
 
     private async checkHeartbeats() {
-        // TODO: check tenant/agent heartbeats from DB and mark offline if needed
+        // TODO: persist DB-backed heartbeat monitoring before production release.
         logger.info('Checking heartbeats...');
     }
 }
