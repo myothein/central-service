@@ -48,6 +48,26 @@ test('ingestion rejects token for different tenant before DB access', async () =
     } finally { if (prior === undefined) delete process.env.CENTRAL_AGENT_KEYS_JSON;
         else process.env.CENTRAL_AGENT_KEYS_JSON = prior; }
 });
+test('tenant agent credential reused as Central admin key fails closed', async () => {
+    const previous = {
+        agent: process.env.CENTRAL_AGENT_KEYS_JSON,
+        admin: process.env.CENTRAL_ADMIN_API_KEY
+    };
+    const shared = 'ci-synthetic-shared-role-key-longer-than-32-bytes';
+    process.env.CENTRAL_AGENT_KEYS_JSON = JSON.stringify({ [tenantId]: shared });
+    process.env.CENTRAL_ADMIN_API_KEY = shared;
+    try {
+        const response = await request(message, shared);
+        assert.equal(response.status, 503);
+        assert.equal(response.body.code, 'AUTH_NOT_CONFIGURED');
+    } finally {
+        if (previous.agent === undefined) delete process.env.CENTRAL_AGENT_KEYS_JSON;
+        else process.env.CENTRAL_AGENT_KEYS_JSON = previous.agent;
+        if (previous.admin === undefined) delete process.env.CENTRAL_ADMIN_API_KEY;
+        else process.env.CENTRAL_ADMIN_API_KEY = previous.admin;
+    }
+});
+
 test('invalid event is rejected before DB access, even with valid tenant key', async () => {
     const prior = process.env.CENTRAL_AGENT_KEYS_JSON;
     const key = 'integration-test-key-that-is-at-least-32-bytes';
